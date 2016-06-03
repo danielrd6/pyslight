@@ -36,8 +36,9 @@ def perturbation(infile, niterate=3,
         with open('temp.in', 'w') as tempin:
             for line in a[:-1]:
                 tempin.write(line)
-            tempin.write(a[-1].replace(specfile, 'tempspec.txt'))
-            tempin.write(a[-1].replace(outsl, 'outsl_{:04d}.txt'.format(c)))
+            tempin.write(
+                a[-1].replace(outsl, 'outsl_{:04d}.txt'.format(c)).
+                replace(specfile, 'tempspec.txt'))
 
         subprocess.call('{:s} < temp.in'.format(slexec), shell=True)
         c += 1
