@@ -8,6 +8,41 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 # import scipy.ndimage as ndim
 from scipy.ndimage import gaussian_filter as gf
+import subprocess
+
+
+def perturbation(infile, niterate=3,
+                 slexec='/datassd/starlight/StarlightChains_v04.exe'):
+    """
+    Function to perturb the spectrum and check the stability of the
+    Starlight solution.
+    """
+
+    with open(infile, 'r') as f:
+        a = f.readlines()
+
+    specfile = a[-1].split()[0]
+    outsl = a[-1].split()[-1]
+    spec = np.loadtxt(specfile, unpack=True)
+    noise = np.average(spec[2])
+
+    c = 0
+    while c < niterate:
+        pspec = 'tempspec.txt'
+        np.savetxt(
+            pspec, np.column_stack([
+                spec[0], np.random.normal(spec[1], noise), spec[2], spec[3]]))
+
+        with open('temp.in', 'w') as tempin:
+            for line in a[:-1]:
+                tempin.write(line)
+            tempin.write(a[-1].replace(specfile, 'tempspec.txt'))
+            tempin.write(a[-1].replace(outsl, 'outsl_{:04d}.txt'.format(c)))
+
+        subprocess.call('{:s} < temp.in'.format(slexec), shell=True)
+        c += 1
+
+    return
 
 
 def fits2sl(spec, mask=None, dwl=1, integerwl=True, writetxt=False,
