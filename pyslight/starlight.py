@@ -224,3 +224,72 @@ def powerlaw_flux(synthfile, wl=5100, alpha=0.5):
     f_lambda = fnorm * xpl / 100. * powerlaw(wl)
 
     return f_lambda
+
+
+def sdss2sl(infile, mask=None, dopcor=False, writetxt=False,
+            outfile='lixo.txt', gauss_convolve=0, normspec=False,
+            wlnorm=[6000, 6100], dwl=1, integerwl=True):
+    """
+    Creates an ASCII file from the sdss spectrum file.
+
+    Parameters
+    ----------
+    infile : string
+        Name of the original SDSS file.
+    mask : string
+        Name of the ASCII maks definition file.
+    dopcor : bool
+        Apply doppler correction based on the redshift from the
+        infile header.
+    write
+    """
+
+    hdul = pf.open(infile)
+
+    wl0 = hdul[0].header['crval1']
+    npoints = np.shape(hdul[0].data)[1]
+    dwl = hdul[0].header['cd1_1']
+
+    wl = 10 ** (wl0 + np.linspace(0, npoints * dwl, npoints))
+
+    if dopcor:
+        wl = wl / (1. + hdul[0].header['z'])
+
+    spectrum = hdul[0].data[0, :] * 1e-17  # in ergs/s/cm^2/A
+    error = hdul[0].data[2, :] * 1e-17  # in ergs/s/cm^2/A
+    origmask = hdul[0].data[3, :]
+
+    print('Average dispersion: ', np.average(np.diff(wl)))
+
+    # Linear interpolation of the spectrum and resampling of
+    # the spectrum.
+
+    f = interp1d(wl, gf(spectrum, gauss_convolve), kind='linear')
+    err = interp1d(wl, gf(error, gauss_convolve), kind='linear')
+    om = interp1d(wl, gf(origmask, gauss_convolve), kind='linear')
+
+    if integerwl:
+        wlrebin = np.arange(int(wl[0]) + 1, int(wl[-1]) - 1)
+        frebin = f(wlrebin)
+        erebin = err(wlrebin)
+        mrebin = om(wlrebin)
+
+    mcol = np.ones(len(wlrebin))
+
+    if mask is not None:
+        masktab = np.loadtxt(mask)
+        for i in range(len(masktab)):
+            mcol[(wlrebin >= masktab[i, 0]) & (wlrebin <= masktab[i, 1])] = 99
+    else:
+        mcol = mrebin
+        mcol[mcol > 3] = 99
+
+    vectors = [wlrebin, frebin, erebin, mcol]
+    txt_format = ['%d', '%.6e', '%.6e', '%d']
+
+    slspec = np.column_stack(vectors)
+
+    if writetxt:
+        np.savetxt(outfile, slspec, fmt=txt_format)
+
+    return slspec
